@@ -10,3 +10,8 @@ A nim tool designed to update instances of various NWN resources within area inf
 |-f, --file|CSV of blueprint files to update|
 |--skip|CSV of fields to skip when updating an instance|
 |--merge|CSV of fields to merge when updating an instance|
+
+example call (case ignored for command line arguments):
+```
+nwnstance --dirs:"~/Neverwinter Nights/modules/<module>" -f myawesomeitem.uti,myotheritem.uti --merge vartable --skip cost,tag
+```
