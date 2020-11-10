@@ -2,10 +2,10 @@
 
 version       = "0.1.0"
 author        = "Ed Burke (tinygiant)"
-description   = "An NWN tool to update blueprint instances in area information (.git) files"
+description   = "An NWN tool to update instances in area information (.git) files"
 license       = "MIT"
 srcDir        = "src"
-bin           = @["instify"]
+bin           = @["nwnstance"]
 
 
 

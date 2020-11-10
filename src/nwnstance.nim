@@ -1,4 +1,4 @@
-import json, shared, strutils, strformat, debugprinter
+import shared, debugprinter
 
 let args = DOC """
 Update instances of blueprints in a packed or unpacked nwn module
@@ -12,25 +12,18 @@ Usage:
   $USAGE
 
 Options:
-  --all                       Match all files.
-  -b, --binary BINARY         Match only files where the data contains BINARY.
   --filetypes TYPES           Comma delimited list of gff file extensions to search
                               for the instance to update [default: git]
   -f, --file FILES            Comma delimited list of blueprint files
-  -s, --source SOURCES        Blueprints as sources to update instances
-  -d, --details               Show more details.
   --skip SKIPS                Fields to skip modification of [Default: ]
   --merge MERGES              Fields to merge [Default: ]
-  --drop DROPS                Fields to drop from the instances [Default: ]
-  --md5                       Generate md5 checksums of files.
-  --sha1                      Generate sha1 checksums of files.
-
   --erfs ERFS                 Load comma-separated erf files [default: ]
   --dirs DIRS                 Load comma-separated directories [default: """ & getCurrentDir() & """]
   $OPT
 """
 
 const
+  # Identifier list to simplify updating
   simpleType = @["byte", "char", "cexostring", "word", "short", "dword", "int", "float", "resref", "cexolocstring"]
   
   # Fields only found in blueprints
@@ -102,19 +95,69 @@ const
                     "utw": @["TemplateResRef", "XOrientation", "YOrientation", "XPosition", "YPosition", "ZPosition"],
                    }.toTable
 
+  ListIdentifier = {"VarTable": "Name",
+                    "ClassList": "Class",
+                    "KnownList": "Spell",
+                    "Equip_ItemList": "__struct_id",
+                    "FeatList": "Feat"
+                   }.toTable
+
 let
   dir = $args["--dirs"]
   dbg = newDebugPrinter(stdout)
 
-proc keys(node: JsonNode): seq[string] =
+if not (args["--dirs"] or args["--erfs"]) and args["--file"]:
+  quit("nwnstance requires reference to target folders and at least one blueprint file")
+
+proc `[]=`(obj: JsonNode, idx: int, val: JsonNode) {.inline.} =
+  ## Custom assignment required by keepItIf since this doesn't exist for JArrays
+  assert(obj.kind == JArray)
+  obj[idx] = val
+
+template keepItIf(node: JsonNode, keep: untyped) =
+  ## Custom template to keep specific elements of a JArray
+  var pos = 0
+
+  for i in 0 ..< node.len:
+    let it {.inject.} = node[i]
+    if keep:
+      if pos != i:
+        when defined(gcDestructors):
+          node[pos] = node[i].move()
+        else:
+          node[pos] = node[i].copy()
+      inc(pos)
+  
+  setLen(node.elems, pos)
+
+proc objectKeys(node: JsonNode): seq[string] =
+  ## Returns all keys in node that are of type JObject
   for k, v in node:
     if v.kind == JObject:
       result.add k
 
-proc mergeLists(instanceList: JsonNode, blueprintList: JsonNode) =
-  echo "mergine"
+proc mergeLists(instanceList, blueprintList: JsonNode, k: string) =
+  ## Merges two JArrays
+  var key = k
+
+  # Support KnownList*
+  if key[key.high].isDigit:
+    key = key[0 ..< key.high]
+
+  if ListIdentifier.hasKey(key):
+    let identifier = ListIdentifier[key]
+
+    instanceList.keepItIf($it.fields[identifier] notin blueprintList.mapIt($(it.fields)[identifier]))
+
+    for item in blueprintList:
+      instanceList.add(item)
+
+    dbg.emit "Merging", fmt"[{k}] merged at user request"
+  else:
+    dbg.emit "Error", fmt"merging {k} is not supported at this time"
 
 proc updateNode(instanceNode: JsonNode, blueprintJson: JsonNode, target: tuple) =
+  ## Update instanceNode with fields from blueprintJson
   for k, v in blueprintJson:
     if k.toLower in mapIt(split($args["--skip"], ","), it.toLower):
       dbg.emit "Skipping", fmt"[{k}] skipped at user request"
@@ -130,14 +173,14 @@ proc updateNode(instanceNode: JsonNode, blueprintJson: JsonNode, target: tuple) 
 
     # we only expect objects and, possible JINTs
     if v.kind != JObject:
-      dbg.emit "Info", fmt"[{k}] is not interesting and will not be modified"
+      dbg.emit "Ignoring", fmt"[{k}] is not interesting and will not be modified"
       continue
 
     let nodeType = blueprintJson[k]["type"].getStr()
 
     if nodeType in simpleType:
       if instanceNode{k}["value"] != blueprintJson[k]["value"]:
-        dbg.emit "Updating", fmt"instance field [{k}] udpated to blueprint field [{k}]:[{$v}]"
+        dbg.emit "Updating", fmt"[{k}] udpated to blueprint field"
         instanceNode{k} = blueprintJson[k]
     elif nodeType == "list":
       if instanceNode{k} == blueprintJson[k]:
@@ -145,18 +188,17 @@ proc updateNode(instanceNode: JsonNode, blueprintJson: JsonNode, target: tuple) 
 
       if k.toLower in mapIt(split($args["--merge"], ","), it.toLower):
         if instanceNode.hasKey(k):
-          dbg.emit "Merging", fmt"[{k}] will be merged at user request"
-          #merge mergeList
+          mergeLists(instanceNode[k]["value"], blueprintJson[k]["value"], k)
           continue
 
       if instanceNode.hasKey(k):
         updateNode(instanceNode[k], blueprintJson[k], target)
       else:
-        dbg.emit "Updating", fmt"instance field [{k}] updated to blueprint field [{k}]:[{$v}]"
+        dbg.emit "Updating", fmt"[{k}] updated to blueprint field"
         instanceNode{k} = blueprintJson[k]
 
 proc updateInstance(instanceJson: JsonNode, blueprintJson: JsonNode, target: tuple, expectedNodes: HashSet) =
-  for k, v in instanceJson:
+  for _, v in instanceJson:
     case v.kind:
     of JString: continue
     of JObject:
@@ -168,15 +210,15 @@ proc updateInstance(instanceJson: JsonNode, blueprintJson: JsonNode, target: tup
       for node in v:
         if node.hasKey(target.key):
           if node[target.key]["value"] == target.value:
-            let excessNodes = node.keys.toHashSet() - expectedNodes
+            let excessNodes = node.objectKeys.toHashSet() - expectedNodes
 
             if excessNodes.len > 0:
-              echo fmt"trimming excess nodes {$excessNodes}"
+              echo fmt"trimming excess nodes {excessNodes}"
               for k, _ in node:
                 if k in excessNodes:
                   node.delete(k)
             
-            dbg.nest fmt"Updating instances of {target.value}":
+            dbg.nest fmt"Updating instance of {target.value}":
               node.updateNode(blueprintJson, target)
           else:
             node.updateInstance(blueprintJson, target, expectedNodes)
@@ -220,7 +262,7 @@ withDir(dir):
 
       if interestingFiles.len > 0:
         # create the field comparison sequence and pass it along.
-        let expectedNodes = (blueprintJson.keys.toHashSet() + 
+        let expectedNodes = (blueprintJson.objectKeys.toHashSet() + 
                             InstanceFields[target.extension].toHashSet()) - 
                             BlueprintFields.toHashSet()
 
@@ -239,42 +281,5 @@ withDir(dir):
           stream.write(instanceStream)
           stream.close
       else:
-        dbg.emit fmt"Info", "No interesting files found for {resRef}"
-
-
-when false:
-  proc writeDebug(s: Stream, tlk: SingleTlk) =
-    ## Writes a "debug" representation of the file that can be diffed easily.
-    input.setPosition(0)
-
-    var dbg = newDebugPrinter(input, s)
-
-    var stringCount: int32 = 0
-    var stringEntriesOffset: int32 = 0
-    dbg.nest "Header":
-      dbg.emit "FileType", input.readStr(4)
-      dbg.emit "FileVersion", input.readStr(4)
-      dbg.emit "LanguageID", input.readInt32()
-      stringCount = input.readInt32()
-      stringEntriesOffset = input.readInt32()
-      dbg.emit "StringCount", stringCount
-      dbg.emit "StringEntriesOffset", stringEntriesOffset
-
-    dbg.nest "StringDataTable":
-      for i in 0..<stringCount:
-        dbg.nest $i:
-          let flags = input.readInt32()
-          let resRef = input.readStr(16) # .strip(leading=false,trailing=true,chars={'\0'})
-          let volVar = input.readInt32()
-          let pitchVar = input.readInt32()
-          let offset = input.readInt32()
-          let strSz = input.readInt32()
-          let sndLen = input.readFloat32()
-          dbg.emit "Flags", flags
-          dbg.emit "ResRef", resRef
-          dbg.emit "VolumeVariance", volVar
-          dbg.emit "PitchVariance", pitchVar
-          dbg.emit "Offset", offset
-          dbg.emit "StringSize", strSz
-          dbg.emit "SoundLength", sndLen
+        dbg.emit "Info", fmt"No interesting files found for {resRef}"
    
