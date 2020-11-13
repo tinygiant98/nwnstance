@@ -8,7 +8,6 @@ Note: this tool does not work on files that have been converted to json via
 
 Usage:
   $0 [options]
-  $0 (--dirs <dir> | --erfs <erf>) [-s <file>...] [--filtetypes <types>...] [options]
   $USAGE
 
 Options:
@@ -18,10 +17,9 @@ Options:
   --skip SKIPS                Fields to skip modification of [Default: ]
   --merge MERGES              Fields to merge [Default: ]
   --erfs ERFS                 Load comma-separated erf files [default: ]
-  --dirs DIRS                 Load comma-separated directories [default: """ & getCurrentDir() & """]
+  --dirs DIRS                 Load comma-separated directories [default: ]
   $OPT
 """
-
 const
   # Identifier list to simplify updating
   simpleType = @["byte", "char", "cexostring", "word", "short", "dword", "int", "float", "resref", "cexolocstring"]
@@ -31,54 +29,54 @@ const
   
   # Not currently used, but good to have for future expansion
   CommonFields = {"utc": @["Appearance_Type", "BodyBag", "Cha", "ChallengeRating", "ClassList", "Con", "Conversation", "CRAdjust",
-                           "CurrentHitPoints", "DecayTime", "Deity", "Description", "Dex", "Disarmable", "Equip_ItemList", "FactionID",
-                           "FeatList", "FirstName", "fortbonus", "Gender", "GoodEvil", "HitPoints", "Int", "Interruptable",
-                           "IsImmortal", "IsPC", "ItemList", "LastName", "LawfulChaotic", "Lootable", "MaxHitPoints", "NaturalAC",
-                           "NoPermDeath", "PerceptionRange", "Phenotype", "Plot", "PortraitID", "Race", "refbonus", "ScriptAttacked",
-                           "ScriptDamaged", "ScriptDeath", "ScriptDialogue", "ScriptDisturbed", "ScriptEndRound", "ScriptHeartbeat",
-                           "ScriptOnBlocked", "ScriptOnNotice", "ScriptRested", "ScriptSpawn", "ScriptSpellAt", "ScriptUserDefine",
-                           "SkillList", "SoundSetFile", "SpecAbilityList", "StartingPackage", "Str", "Subrace", "Tag", "Tail", "WalkRate",
-                           "willbonue", "Wings", "VarTable"],
+                          "CurrentHitPoints", "DecayTime", "Deity", "Description", "Dex", "Disarmable", "Equip_ItemList", "FactionID",
+                          "FeatList", "FirstName", "fortbonus", "Gender", "GoodEvil", "HitPoints", "Int", "Interruptable",
+                          "IsImmortal", "IsPC", "ItemList", "LastName", "LawfulChaotic", "Lootable", "MaxHitPoints", "NaturalAC",
+                          "NoPermDeath", "PerceptionRange", "Phenotype", "Plot", "PortraitID", "Race", "refbonus", "ScriptAttacked",
+                          "ScriptDamaged", "ScriptDeath", "ScriptDialogue", "ScriptDisturbed", "ScriptEndRound", "ScriptHeartbeat",
+                          "ScriptOnBlocked", "ScriptOnNotice", "ScriptRested", "ScriptSpawn", "ScriptSpellAt", "ScriptUserDefine",
+                          "SkillList", "SoundSetFile", "SpecAbilityList", "StartingPackage", "Str", "Subrace", "Tag", "Tail", "WalkRate",
+                          "willbonus", "Wings", "VarTable"],
                   "utd": @["AnimationState", "Appearance", "AutoRemoveKey", "CloseLockDC", "Conversation", "CurrentHP",
-                           "Description", "DisarmDC", "Faction", "Fort", "Hardness", "HP", "Interruptable", "Lockable",
-                           "Locked", "LocName", "OnClosed", "OnDamaged", "OnDeath", "OnDisarm", "OnHeartbeat", "OnLock",
-                           "OnMeleeAttacked", "OnOpen", "OnSpellCastAt", "OnTrapTriggered", "OnUnlock", "OnUserDefined",
-                           "OpenLockDC", "Plot", "PortraitID", "Ref", "Tag", "TemplateResRef", "TrapDetectable", "TrapDetectDC",
-                           "TrapDisarmable", "TrapFlag", "TrapOneShot", "TrapType", "Will", "VarTable",
-                           "GenericType", "LinkedTo", "LinkedToFlags", "LoadScreenID", "OnClick", "OnFailToOpen"],
+                          "Description", "DisarmDC", "Faction", "Fort", "Hardness", "HP", "Interruptable", "Lockable",
+                          "Locked", "LocName", "OnClosed", "OnDamaged", "OnDeath", "OnDisarm", "OnHeartbeat", "OnLock",
+                          "OnMeleeAttacked", "OnOpen", "OnSpellCastAt", "OnTrapTriggered", "OnUnlock", "OnUserDefined",
+                          "OpenLockDC", "Plot", "PortraitID", "Ref", "Tag", "TemplateResRef", "TrapDetectable", "TrapDetectDC",
+                          "TrapDisarmable", "TrapFlag", "TrapOneShot", "TrapType", "Will", "VarTable",
+                          "GenericType", "LinkedTo", "LinkedToFlags", "LoadScreenID", "OnClick", "OnFailToOpen"],
                   "ute": @["Active", "CreatureList", "Difficulty", "DifficultyIndex", "Faction", "LocalizedName",
-                           "MaxCreatures", "OnEntered", "OnExhausted", "OnExit", "OnHeartbeat", "OnUserDefined", "PlayerOnly",
-                           "RecCreatures", "Reset", "ResetTime", "Respawns", "SpawnOption", "Tag", "TemplateResref", "VarTable"],
+                          "MaxCreatures", "OnEntered", "OnExhausted", "OnExit", "OnHeartbeat", "OnUserDefined", "PlayerOnly",
+                          "RecCreatures", "Reset", "ResetTime", "Respawns", "SpawnOption", "Tag", "TemplateResref", "VarTable"],
                   "uti": @["AddCost", "BaseItem", "Charges", "Cost", "Cursed", "DescIdentified", "Description", "LocalizedName",
-                           "Plot", "PropertiesList", "StackSize", "Stolen", "Tag", "TemplateResRef",
-                           "Cloth1Color", "Cloth2Color", "Leather1Color", "Leather2Color", "Metal1Color", "Metal2Color",
-                           "ModelPart1", "ModelPart2", "ModelPart3", "ArmorPart_Belt", "ArmorPart_LBicep", "ArmorPart_LFArm",
-                           "ArmorPart_LFoot", "ArmorPart_LHand", "ArmorPart_LShin", "ArmorPart_LShoul", "ArmorPart_LThigh",
-                           "ArmorPart_Neck", "ArmorPart_Pelvis", "ArmorPart_RBicep", "ArmorPart_RFArm", "ArmorPart_RFoot",
-                           "ArmorPart_RHand", "ArmorPart_Robe", "ArmorPart_RShin", "ArmorPart_RShoul", "ArmorPart_RThigh",
-                           "ArmorPart_Torso", "VarTable",
-                           "Repos_PosX", "Repos_Posy"],                  
+                          "Plot", "PropertiesList", "StackSize", "Stolen", "Tag", "TemplateResRef",
+                          "Cloth1Color", "Cloth2Color", "Leather1Color", "Leather2Color", "Metal1Color", "Metal2Color",
+                          "ModelPart1", "ModelPart2", "ModelPart3", "ArmorPart_Belt", "ArmorPart_LBicep", "ArmorPart_LFArm",
+                          "ArmorPart_LFoot", "ArmorPart_LHand", "ArmorPart_LShin", "ArmorPart_LShoul", "ArmorPart_LThigh",
+                          "ArmorPart_Neck", "ArmorPart_Pelvis", "ArmorPart_RBicep", "ArmorPart_RFArm", "ArmorPart_RFoot",
+                          "ArmorPart_RHand", "ArmorPart_Robe", "ArmorPart_RShin", "ArmorPart_RShoul", "ArmorPart_RThigh",
+                          "ArmorPart_Torso", "VarTable",
+                          "Repos_PosX", "Repos_Posy"],                  
                   "utm": @["BlackMarket", "BM_Markdown", "IdentifyPrice", "LocName", "MarkDown", "MarkUp", "MaxBuyPrice",
-                           "OnOpenStore", "OnCloseStore", "ResRef", "StoreGold", "StoreList", "WillNotBuy", "WillOnlyBuy", "Tag",
-                           "ItemList", "VarTable"],
+                          "OnOpenStore", "OnCloseStore", "ResRef", "StoreGold", "StoreList", "WillNotBuy", "WillOnlyBuy", "Tag",
+                          "ItemList", "VarTable"],
                   "utp": @["AnimationState", "Appearance", "AutoRemoveKey", "CloseLockDC", "Conversation", "CurrentHP",
-                           "Description", "DisarmDC", "Faction", "Fort", "Hardness", "HP", "Interruptable", "Lockable",
-                           "Locked", "LocName", "OnClosed", "OnDamaged", "OnDeath", "OnDisarm", "OnHeartbeat", "OnLock",
-                           "OnMeleeAttacked", "OnOpen", "OnSpellCastAt", "OnTrapTriggered", "OnUnlock", "OnUserDefined",
-                           "OpenLockDC", "Plot", "PortraitID", "Ref", "Tag", "TemplateResRef", "TrapDetectable", "TrapDetectDC",
-                           "TrapDisarmable", "TrapFlag", "TrapOneShot", "TrapType", "Will",
-                           "BodyBag", "HasInventory", "ItemList", "OnInvDisturbed", "OnUsed", "Static", "Type", "Useable",
-                           "ItemList", "VarTable"],
+                          "Description", "DisarmDC", "Faction", "Fort", "Hardness", "HP", "Interruptable", "Lockable",
+                          "Locked", "LocName", "OnClosed", "OnDamaged", "OnDeath", "OnDisarm", "OnHeartbeat", "OnLock",
+                          "OnMeleeAttacked", "OnOpen", "OnSpellCastAt", "OnTrapTriggered", "OnUnlock", "OnUserDefined",
+                          "OpenLockDC", "Plot", "PortraitID", "Ref", "Tag", "TemplateResRef", "TrapDetectable", "TrapDetectDC",
+                          "TrapDisarmable", "TrapFlag", "TrapOneShot", "TrapType", "Will",
+                          "BodyBag", "HasInventory", "ItemList", "OnInvDisturbed", "OnUsed", "Static", "Type", "Useable",
+                          "ItemList", "VarTable"],
                   "uts": @["Active", "Continuous", "Elevation", "Hours", "Interval", "IntervalVrtn", "LocName", "Looping",
-                           "MaxDistance", "MinDistance", "PitchVariation", "Positional", "Priority", "Random", "RandomPosition",
-                           "RandomRangeX", "RandomRangeY", "Sounds", "Tag", "TemplateResRef", "Times", "Volume", "VolumeVrtn", "VarTable"],
+                          "MaxDistance", "MinDistance", "PitchVariation", "Positional", "Priority", "Random", "RandomPosition",
+                          "RandomRangeX", "RandomRangeY", "Sounds", "Tag", "TemplateResRef", "Times", "Volume", "VolumeVrtn", "VarTable"],
                   "utt": @["AutoRemoveKey", "Cursor", "DisarmDC", "Faction", "HighlightHeight", "KeyName", "LinkedTo",
-                           "LinkedToFlags", "LoadScreenID", "LocalizedName", "OnClick", "OnDisarm", "OnTrapTriggered",
-                           "PortraitID", "ScriptHeartbeat", "ScriptOnEnter", "ScriptOnExit", "ScriptUserDefine", "Tag",
-                           "TemplateResRef", "TrapDetectable", "TrapDetectDC", "TrapDisarmable", "TrapFlag", "TrapOneShot",
-                           "TrapType", "Type", "VarTable"],
+                          "LinkedToFlags", "LoadScreenID", "LocalizedName", "OnClick", "OnDisarm", "OnTrapTriggered",
+                          "PortraitID", "ScriptHeartbeat", "ScriptOnEnter", "ScriptOnExit", "ScriptUserDefine", "Tag",
+                          "TemplateResRef", "TrapDetectable", "TrapDetectDC", "TrapDisarmable", "TrapFlag", "TrapOneShot",
+                          "TrapType", "Type", "VarTable"],
                   "utw": @["Appearance", "Description", "HasMapNote", "LinkedTo", "LocalizedName", "MapNote", "MapNoteEnabled",
-                           "Tag", "VarTable"],
+                          "Tag", "VarTable"],
                   }.toTable
   
   # Fields only found in instances
@@ -86,33 +84,63 @@ const
                     "utd": @["Bearing", "TemplateResRef", "X", "Y", "Z"],
                     "ute": @["Geometry", "SpawnPointList", "TemplateResRef", "XPosition", "YPosition", "ZPosition"],
                     "uti": @["TemplateResRef", "XOrientation", "YOrientation", "XPosition", "YPosition", "ZPosition",
-                             "Repos_PosX", "Repos_Posy"],
+                            "Repos_PosX", "Repos_Posy"],
                     "utm": @["TemplateResRef", "XOrientation", "YOrientation", "XPosition", "YPosition", "ZPosition"],
                     "utp": @["Bearing", "TemplateResRef", "X", "Y", "Z",
-                             "ItemList"],
+                            "ItemList"],
                     "uts": @["GeneratedType", "TemplateResRef", "XPosition", "YPosition", "ZPosition"],
                     "utt": @["Geometry", "TemplateResRef", "XOrientation", "YOrientation", "XPosition", "YPosition", "ZPosition"],
                     "utw": @["TemplateResRef", "XOrientation", "YOrientation", "XPosition", "YPosition", "ZPosition"],
-                   }.toTable
+                  }.toTable
 
   ListIdentifier = {"VarTable": "Name",
                     "ClassList": "Class",
                     "KnownList": "Spell",
                     "Equip_ItemList": "__struct_id",
                     "FeatList": "Feat"
-                   }.toTable
+                  }.toTable
 
-let
-  dir = $args["--dirs"]
-  dbg = newDebugPrinter(stdout)
+if not args["--file"]:
+  quit("Blueprint file name(s) must be specified with -f or --file.")
 
-if not (args["--dirs"] or args["--erfs"]) and args["--file"]:
-  quit("nwnstance requires reference to target folders and at least one blueprint file")
+let dbg = newDebugPrinter(stdout)
 
 proc `[]=`(obj: JsonNode, idx: int, val: JsonNode) {.inline.} =
   ## Custom assignment required by keepItIf since this doesn't exist for JArrays
   assert(obj.kind == JArray)
   obj[idx] = val
+
+proc isResDir(c: ResContainer): bool = startsWith($c, "ResDir:")
+
+proc resRefToFullPath(self: ResContainer, rr: ResolvedResRef): string =
+  let path = split($self, ":", 1)
+  result = path[path.high] & DirSep & rr.toFile
+
+proc resContainerToFullPath(self: ResContainer): string =
+  let path = split($self, ":", 1)
+  result = path[path.high]
+
+#proc unpackedErfDir(self: ResContainer): string =
+#  reContainerToFullPath(self) / "_erftemp"
+
+proc openErf(filename: string): Erf =
+  let infile = openFileStream(filename)
+  doAssert(infile != nil, "Could not open " & filename & " for reading")
+  result = infile.readErf(filename = filename.splitPath.tail)
+
+##proc unpackErf(openErf: Erf) =
+ # withDir(unpackedErfDir):
+ #   for c in openErf.contents
+ #     writeFile($c, openErf.demand(c).readAll())
+
+#[elif args["-x"]:
+  let erf = openErf()
+  let want = @(args["<file>"])
+  for c in erf.contents:
+    if want.len == 0 or want.find($c) != -1:
+      if verbose: echo c
+      writeFile($c, erf.demand(c).readAll())]#
+
 
 template keepItIf(node: JsonNode, keep: untyped) =
   ## Custom template to keep specific elements of a JArray
@@ -154,7 +182,7 @@ proc mergeLists(instanceList, blueprintList: JsonNode, k: string) =
 
     dbg.emit "Merging", fmt"[{k}] merged at user request"
   else:
-    dbg.emit "Error", fmt"merging {k} is not supported at this time"
+    dbg.emit "Error", fmt"merging [{k}] is not supported at this time"
 
 proc updateNode(instanceNode: JsonNode, blueprintJson: JsonNode, target: tuple) =
   ## Update instanceNode with fields from blueprintJson
@@ -225,24 +253,95 @@ proc updateInstance(instanceJson: JsonNode, blueprintJson: JsonNode, target: tup
     else:
       continue
 
-if not args["--file"]:
-  quit("Blueprint file name(s) must be specified with -f or --file.")
+  #Let's start over using json cuz that shit didn't work
+  #This all works, let's try to do it by reading directly from and writing back
+  # into the resman files?  See below
+  when false:
+    #withDir(dir):
+    for file in split($args["--file"], ","):
+      let
+        blueprintStream = openFileStream(file).readGffRoot(false)
+        blueprintJson = blueprintStream.toJson()
+        field = if getFileExt(file) == "utm": "ResRef" else: "TemplateResRef"
 
-#Let's start over using json cuz that shit didn't work
-withDir(dir):
-  for file in split($args["--file"], ","):
-    let
-      blueprintStream = openFileStream(file).readGffRoot(false)
-      blueprintJson = blueprintStream.toJson()
-      field = if getFileExt(file) == "utm": "ResRef" else: "TemplateResRef"
+      if not blueprintStream.hasField(field, GffResRef):
+        debug fmt"{file} does not have a resref field and may not be a valid gff resource; skipping."
+        continue
 
-    if not blueprintStream.hasField(field, GffResRef):
-      debug fmt"{file} does not have a resref field and may not a valid gff resource; skipping."
+      let
+        resRef = $blueprintStream[field, GffResRef]
+        rm = newBasicResMan()
+
+      var
+        interestingFiles: seq[string]
+        instanceStream: GffRoot
+        instanceJson: JsonNode
+        target: tuple[key: string, value: JsonNode, extension: string]
+        stream: Stream
+      
+      target.key = field
+      target.value = %($resRef)
+      target.extension = getFileExt(file)
+
+      for res in filterByMatch(rm, resRef):
+        interestingFiles.add($res.resRef)
+
+      dbg.nest fmt"Updating instances of {resRef}":
+
+        if interestingFiles.len > 0:
+          # create the field comparison sequence and pass it along.
+          let expectedNodes = (blueprintJson.objectKeys.toHashSet() + 
+                              InstanceFields[target.extension].toHashSet()) - 
+                              BlueprintFields.toHashSet()
+
+          dbg.emit "Found", fmt"{interestingFiles.len} files that " &
+                            fmt"are interesting for {resRef}"
+
+          for file in interestingFiles:
+            stream = openFileStream(file)
+            instanceStream = stream.readGffRoot(false)
+            stream.close 
+            instanceJson = instanceStream.toJson()
+            instanceJson.updateInstance(blueprintJson, target, expectedNodes)
+            instanceStream = instanceJson.gffRootFromJson()
+
+            stream = openFileStream(file, fmWrite)
+            stream.write(instanceStream)
+            stream.close
+        else:
+          dbg.emit "Info", fmt"No interesting files found for {resRef}"
+
+let rm = newBasicResMan()
+
+# Don't cross the streams
+for c in rm.containers:
+  let rmc = newResMan()
+  var modifiedFiles: Table[string, ResMemFile]
+
+  rmc.add(c)
+
+  for fileName in split($args["--file"], ","):
+    let rr = newResolvedResRef(fileName)
+    var resRef: string
+
+    if not c.contains(rr):
+      echo fmt"{rr} could not be found in {c}"
       continue
 
+    let blueprint = rmc[rr].get()
+    blueprint.seek()
+
     let
-      resRef = $blueprintStream[field, GffResRef]
-      rm = newBasicResMan()
+      blueprintStream = blueprint.io.readGffRoot(false)
+      blueprintJson = blueprintStream.toJson()
+      field = if rr.resExt() == "utm": "ResRef" else: "TemplateResRef"
+
+    if not blueprintStream.hasField(field, GffResRef):
+      debug fmt"{fileName} does not have a resref field and may not be a valid gff resource; skipping"
+      continue
+
+    # target is the old resRef, or the stringified data from TemplateResRef field in the .ut*
+    resRef = $blueprintStream[field, GffResRef]
 
     var
       interestingFiles: seq[string]
@@ -253,33 +352,141 @@ withDir(dir):
     
     target.key = field
     target.value = %($resRef)
-    target.extension = getFileExt(file)
+    target.extension = getFileExt(fileName)
 
-    for res in filterByMatch(rm, resRef):
+    for res in filterByMatch(rmc, resRef):
       interestingFiles.add($res.resRef)
 
-    dbg.nest fmt"Updating instances of {resRef}":
-
-      if interestingFiles.len > 0:
+    if interestingFiles.len > 0:
+      dbg.nest fmt"Updating instances of {resRef}":
         # create the field comparison sequence and pass it along.
         let expectedNodes = (blueprintJson.objectKeys.toHashSet() + 
                             InstanceFields[target.extension].toHashSet()) - 
                             BlueprintFields.toHashSet()
 
         dbg.emit "Found", fmt"{interestingFiles.len} files that " &
-                           fmt"are interesting for {resRef}"
+                          fmt"are interesting for {resRef}"
 
         for file in interestingFiles:
-          stream = openFileStream(file)
-          instanceStream = stream.readGffRoot(false)
-          stream.close 
+          let 
+            rr = newResolvedResRef(file)
+            instance = rmc[rr].get()
+
+          if c.isResDir():
+            stream = openFileStream(c.resRefToFullPath(rr))
+            instanceStream = stream.readGffRoot(false)
+            stream.close
+          else: 
+            instance.seek()
+            instanceStream = instance.io.readGffRoot(false)
+
+          # this is where all the work is done, the rest is just making shit smell nice
           instanceJson = instanceStream.toJson()
           instanceJson.updateInstance(blueprintJson, target, expectedNodes)
           instanceStream = instanceJson.gffRootFromJson()
 
-          stream = openFileStream(file, fmWrite)
-          stream.write(instanceStream)
-          stream.close
-      else:
-        dbg.emit "Info", fmt"No interesting files found for {resRef}"
-   
+          if c.isResDir():
+            stream = openFileStream(c.resRefToFullPath(rr), fmWrite)
+            stream.write(instanceStream)
+            stream.close
+          else:
+            stream = newStringStream()
+            stream.write(instanceStream)
+            
+            let rmf = newResMemFile(stream.readAll(), newResRef(rr.resRef, rr.resType))
+            modifiedFiles.add(rr.toFile, rmf)
+    else:
+      dbg.emit "Info", fmt"No interesting files found for {resRef}"
+
+  echo fmt"Total modified files - {modifiedFiles.len}"
+
+  if modifiedFiles.len > 0:
+    let erfPath = resContainerToFullPath(c) # the .mod file
+    let oldErf = openErf(erfPath)           # the opened .mod file
+    
+    # have to use a second file since trying to use the first will
+    # throw an error.  This is a temporary measure until the writing works
+    # correctly, then I'll write out the new file and overwrite the old one.
+    let temp = "C:\\Users\\Ed\\Documents\\Neverwinter Nights\\modules\\core_f.mod"
+    
+    writeErf(openFileStream(temp, fmWrite),
+             oldErf.fileType,
+             oldErf.locStrings,
+             oldErf.strRef,
+             toSeq(oldErf.contents)) do (r: ResRef, io: Stream):
+      
+      #echo $openErf.fileType
+      #echo $openErf.locStrings
+      #echo $openErf.strRef
+
+      
+      #let content = oldErf.demand(r).readAll(useCache = false)
+      let ff = oldErf.demand(r)
+      ff.seek()
+
+      #Do Nothing
+
+      io.write(ff.readAll())
+      discard
+
+
+      #let content = ff.readAll()
+      
+      #if $r.resType == "git":
+      #  writeFile($r, content)
+      #echo $contents
+      #io.write(content)
+
+      #let data = readFile(r.resRef & "." & $resType(r))
+      #io.write(data)
+#[
+
+      when false:
+        # gives a corrupt file
+        let ff = openErf.demand(r)
+        ff.seek()
+        io.write(ff.readAll(useCache = false))
+        echo r.resRef
+
+      #throws an assertion error
+      when false:
+        let ff = openErf.demand(r)
+        ff.seek()
+
+        let rr = newResolvedResRef(r.resRef & "." & getResExt(r.resType))
+        if rr.resExt in GffExtensions:
+          var root = readGffRoot(ff.io)
+
+          io.write(root)
+        else:
+          io.write(ff.readAll())
+      
+      # gives a corrupt file
+      when false:
+        let instance = rmc[rr].get()
+        instance.seek
+        echo $instance.io.getPosition()
+
+        if rr.resExt in GffExtensions:
+          echo "resExt is in GFFExtentions"
+          echo fmt"Current file {rr.resRef}.{rr.resExt}"
+          let instanceStream = instance.io.readGffRoot(false)
+          io.write(instanceStream)
+        else:
+          io.write(instance.readAll(useCache = false))
+      
+      # gives a corrupt file
+      when false:
+        let currentRes = openErf.demand(r)
+        currentRes.seek()
+
+        if modifiedFiles.hasKey($r):
+          let res = modifiedFiles[$r].demand(r)
+          echo fmt"Writing out modified file {r}"
+          io.write(res.readAll())
+        else:
+          echo fmt"writing out non-gff file {r}"
+          io.write(currentRes.readAll())
+
+      #echo fmt"writing {currentRes}"
+      #io.write(currentRes.readAll(useCache = false)) ]#

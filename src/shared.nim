@@ -2,14 +2,14 @@ import strformat, strutils, algorithm, os, streams, json, sequtils, logging, tim
 export strformat, strutils, algorithm, os, streams, json, sequtils, logging, times, tables, sets, strutils
 
 import neverwinter/util, neverwinter/resman,
-  #neverwinter/resref, neverwinter/key,
-  #neverwinter/resfile, neverwinter/resmemfile, neverwinter/resdir,
+  neverwinter/resref, neverwinter/key,
+  neverwinter/resfile, neverwinter/resmemfile, neverwinter/resdir,
   neverwinter/resdir, neverwinter/erf, neverwinter/gff, neverwinter/gffjson
   #neverwinter/languages
 
 # The things we do to cut down import hassle in tools.
 # Should clean this up at some point and let the utils deal with it.
-export util, resman, gff, erf, gffjson
+export util, resman, gff, erf, gffjson, resdir, resmemfile, resfile, resref, key
 #export util, resman, resref, key, resfile, resmemfile, resdir, erf, gff, gffjson,
 #  languages
 
@@ -164,6 +164,7 @@ proc newBasicResMan*(root = "", language = "", cacheSize = 0): ResMan =
     else: $Args["--keys"]
 
   let keys =        actualKeys.split(",").mapIt(it.strip).filterIt(it.len > 0)]#
+
   let erfs = ($Args["--erfs"]).split(",").mapIt(it.strip).filterIt(it.len > 0)
   let dirs = ($Args["--dirs"]).split(",").mapIt(it.strip).filterIt(it.len > 0)
 
@@ -259,7 +260,7 @@ iterator filterByMatch*(rm: ResMan, binaryMatch: string): Res =
     if getFileExt($res.resRef) notin split($Args["--filetypes"], ","):
       continue
 
-    let match = res.readAll().count(binaryMatch)
+    let match = res.readAll(useCache = false).count(binaryMatch)
     let plurality = if match != 1: "s" else: ""
 
     if match > 0:
