@@ -246,13 +246,15 @@ proc updateInstance(instanceJson: JsonNode, blueprintJson: JsonNode, target: tup
       continue
 
 proc updateField(blueprintJson: JsonNode) =
-  var empty: bool
-  
   for kvp in split($args["--set"], ","):
+    var empty: bool = false
+
     let kv = kvp.split(":")
+    if kv.len == 0: continue
+    if kv.len == 1 or kv[1] == "": empty = true
+
     if blueprintJson.hasKey(kv[0]):
       let key = blueprintJson[kv[0]]["type"].getStr()
-      if kv[1] == "": empty = true
       case key
       of "dword", "short", "int", "byte", "word":
         if empty: blueprintJson[kv[0]]["value"] = %0
