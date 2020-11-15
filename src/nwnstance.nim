@@ -7,6 +7,8 @@ Note: this tool does not work on files that have been converted to json via
   tools such as neverwinter.nim.  Unpacked modules must be in gff formats.
 
 Usage:
+  $0 [--erfs <erf> | --dirs <dir>] [-f | --file <file>,...] [options]
+  $0 [--filtypes <filetype>, ...] [--set <field:value>, ...] [--only <filename>, ... | --skip <filename>, ...]
   $0 [options]
   $USAGE
 
@@ -14,7 +16,8 @@ Options:
   --filetypes TYPES           Comma delimited list of gff file extensions to search
                               for the instance to update [default: git]
   -f, --file FILES            Comma delimited list of blueprint files
-  --skip SKIPS                Fields to skip modification of [Default: ]
+  --skip SKIPS                Skip fileds/files to modify [Default: ]
+  --only ONLY                 Only fields/files to update [Default: ]
   --set SETS                  Set Fields to specific values [Default: ]
   --merge MERGES              Fields to merge [Default: ]
   --erfs ERFS                 Load comma-separated erf files [default: ]
@@ -123,13 +126,6 @@ proc resContainerToFullPath(self: ResContainer): string =
   ## Provides full files pathing to self, only works with erfs
   let path = split($self, ":", 1)
   result = path[path.high]
-
-proc openErf(filename: string): Erf =
-  ## reads an Erf into memory.
-  ## Copy of openErf from nwn_erf.nim since it's not a library
-  let infile = openFileStream(filename)
-  doAssert(infile != nil, "Could not open " & filename & " for reading")
-  result = infile.readErf(filename = filename.splitPath.tail)
 
 template keepItIf(node: JsonNode, keep: untyped) =
   ## Custom template to keep specific elements of a JArray
@@ -250,13 +246,29 @@ proc updateInstance(instanceJson: JsonNode, blueprintJson: JsonNode, target: tup
       continue
 
 proc updateField(blueprintJson: JsonNode) =
+  var empty: bool
+  
   for kvp in split($args["--set"], ","):
     let kv = kvp.split(":")
     if blueprintJson.hasKey(kv[0]):
       let key = blueprintJson[kv[0]]["type"].getStr()
+      if kv[1] == "": empty = true
       case key
       of "dword", "short", "int", "byte", "word":
-        blueprintJson[kv[0]]["value"] = %kv[1].parseInt()
+        if empty: blueprintJson[kv[0]]["value"] = %0
+        else: blueprintJson[kv[0]]["value"] = %kv[1].parseInt()
+      of "list":
+        if empty: blueprintJson[kv[0]]["value"] = %[]
+        else: discard
+      of "cexostring", "resref":
+        if empty: blueprintJson[kv[0]]["value"] = %""
+        else: blueprintJson[kv[0]]["value"] = %kv[1]
+      of "float":
+        if empty: blueprintJson[kv[0]]["value"] = %0.0
+        else: blueprintJson[kv[0]]["value"] = %kv[1].parseFloat()
+      of "cexolocstring":
+        if empty: blueprintJson[kv[0]]["value"] = %* {}
+        else: blueprintJson[kv[0]]["value"]["0"] = %kv[1]
 
 # create the base resman that has all the erfs/dirs in it
 let rm = newBasicResMan()
@@ -281,11 +293,10 @@ if args["--set"]:
     blueprintRoot = blueprintJson.gffRootFromJson()
 
     stream = newFileStream(dir / $file.resRef, fmWrite)
-    #stream.setPosition(0)
     stream.write(blueprintRoot)
     stream.close()
 
-  quit("done with blueprint stuff!")
+  quit()
 
 # Don't cross the streams
 for c in rm.containers:

@@ -259,7 +259,10 @@ iterator filterByType*(rm: ResMan): Res =
     let res = rm[o].get()
 
     if getFileExt($res.resRef) in split($Args["--filetypes"], ","):
-      yield(res)
+      if Args["--only"] and $res.resRef in split($Args["--only"]):
+        yield(res)
+      elif $res.resRef notin split($Args["--skip"]):
+        yield(res)
 
 iterator filterByMatch*(rm: ResMan, binaryMatch: string): Res =
   for o in rm.contents:
