@@ -254,6 +254,13 @@ proc getFileExt*(file: string): string =
   ## Returns the file extension without the leading "."
   file.splitFile.ext.strip(chars = {ExtSep})
 
+iterator filterByType*(rm: ResMan): Res =
+  for o in rm.contents:
+    let res = rm[o].get()
+
+    if getFileExt($res.resRef) in split($Args["--filetypes"], ","):
+      yield(res)
+
 iterator filterByMatch*(rm: ResMan, binaryMatch: string): Res =
   for o in rm.contents:
     let res = rm[o].get()

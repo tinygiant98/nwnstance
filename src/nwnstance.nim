@@ -15,6 +15,7 @@ Options:
                               for the instance to update [default: git]
   -f, --file FILES            Comma delimited list of blueprint files
   --skip SKIPS                Fields to skip modification of [Default: ]
+  --set SETS                  Set Fields to specific values [Default: ]
   --merge MERGES              Fields to merge [Default: ]
   --erfs ERFS                 Load comma-separated erf files [default: ]
   --dirs DIRS                 Load comma-separated directories [default: ]
@@ -100,8 +101,8 @@ const
                     "FeatList": "Feat"
                   }.toTable
 
-if not args["--file"]:
-  quit("Blueprint file name(s) must be specified with -f or --file.")
+#if not args["--file"]:
+#  quit("Blueprint file name(s) must be specified with -f or --file.")
 
 let dbg = newDebugPrinter(stdout)
 
@@ -248,9 +249,43 @@ proc updateInstance(instanceJson: JsonNode, blueprintJson: JsonNode, target: tup
     else:
       continue
 
+proc updateField(blueprintJson: JsonNode) =
+  for kvp in split($args["--set"], ","):
+    let kv = kvp.split(":")
+    if blueprintJson.hasKey(kv[0]):
+      let key = blueprintJson[kv[0]]["type"].getStr()
+      case key
+      of "dword", "short", "int", "byte", "word":
+        blueprintJson[kv[0]]["value"] = %kv[1].parseInt()
+
 # create the base resman that has all the erfs/dirs in it
 let rm = newBasicResMan()
-echo rm.containers[0].contents
+
+if args["--set"]:
+  var
+    dir = $args["--dirs"]
+    blueprintRoot: GffRoot
+    blueprintJson: JsonNode
+    stream: Stream
+
+  # update individual files
+  for file in filterByType(rm):
+    echo $file.resRef
+    echo dir / $file.resRef
+    stream = newFileStream(dir / $file.resRef, fmRead)
+    blueprintRoot = stream.readGffRoot(false)
+    stream.close()
+
+    blueprintJson = blueprintRoot.toJson()
+    blueprintJson.updateField()
+    blueprintRoot = blueprintJson.gffRootFromJson()
+
+    stream = newFileStream(dir / $file.resRef, fmWrite)
+    #stream.setPosition(0)
+    stream.write(blueprintRoot)
+    stream.close()
+
+  quit("done with blueprint stuff!")
 
 # Don't cross the streams
 for c in rm.containers:
