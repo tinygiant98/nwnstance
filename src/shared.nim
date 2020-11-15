@@ -210,6 +210,7 @@ proc newBasicResMan*(root = "", language = "", cacheSize = 0): ResMan =
     let erf = fs.readErf(e)
     debug "  ", erf
     result.add(erf)
+
 #[
   if not legacyLayout and not Args["--no-ovr"]:
     let c = newResDir(root / "ovr")
@@ -266,4 +267,3 @@ iterator filterByMatch*(rm: ResMan, binaryMatch: string): Res =
     if match > 0:
       debug fmt"Found {$match} instance{plurality} of {binaryMatch} in {$res.resRef}"
       yield(res)
-    else: echo "didn't find it"
