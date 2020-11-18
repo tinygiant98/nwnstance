@@ -7,8 +7,6 @@ Note: this tool does not work on files that have been converted to json via
   tools such as neverwinter.nim.  Unpacked modules must be in gff formats.
 
 Usage:
-  $0 [--erfs <erf> | --dirs <dir>] [-f | --file <file>,...] [options]
-  $0 [--filtypes <filetype>, ...] [--set <field:value>, ...] [--only <filename>, ... | --skip <filename>, ...]
   $0 [options]
   $USAGE
 
@@ -171,7 +169,7 @@ proc mergeLists(instanceList, blueprintList: JsonNode, k: string) =
 
     dbg.emit "Merging", fmt"[{k}] merged at user request"
   else:
-    dbg.emit "Skipping", fmt"merging [{k}] is not supported at this time"
+    dbg.debug "Skipping", fmt"merging [{k}] is not supported at this time"
 
 proc updateNode(instanceNode: JsonNode, blueprintJson: JsonNode, target: tuple) =
   ## Update instanceNode with fields from blueprintJson
@@ -182,17 +180,17 @@ proc updateNode(instanceNode: JsonNode, blueprintJson: JsonNode, target: tuple) 
 
     # don't modify instance-only fields
     if k in InstanceFields[target.extension]:
-      dbg.emit "Ignoring", fmt"[{k}] is an instance-only field and will be ignored"
+      dbg.debug "Ignoring", fmt"[{k}] is an instance-only field and will be ignored"
       continue
 
     # don't add blueprint-only fields
     if k in BlueprintFields:
-      dbg.emit "Ignoring", fmt"[{k}] is a blueprint-only field and will be ignored"
+      dbg.debug "Ignoring", fmt"[{k}] is a blueprint-only field and will be ignored"
       continue
 
     # we only expect objects and, possible JINTs
     if v.kind != JObject:
-      dbg.emit "Ignoring", fmt"[{k}] is not interesting and will not be modified"
+      dbg.debug "Ignoring", fmt"[{k}] is not interesting and will not be modified"
       continue
 
     let nodeType = blueprintJson[k]["type"].getStr()
@@ -256,13 +254,13 @@ proc updateField(blueprintJson: JsonNode) =
     if blueprintJson.hasKey(kv[0]):
       let key = blueprintJson[kv[0]]["type"].getStr()
       case key
-      of "dword", "short", "int", "byte", "word":
+      of "dword", "short", "int", "byte", "word", "double", "dword64", "int64":
         if empty: blueprintJson[kv[0]]["value"] = %0
         else: blueprintJson[kv[0]]["value"] = %kv[1].parseInt()
       of "list":
         if empty: blueprintJson[kv[0]]["value"] = %[]
         else: discard
-      of "cexostring", "resref":
+      of "cexostring", "resref", "char":
         if empty: blueprintJson[kv[0]]["value"] = %""
         else: blueprintJson[kv[0]]["value"] = %kv[1]
       of "float":
@@ -271,9 +269,10 @@ proc updateField(blueprintJson: JsonNode) =
       of "cexolocstring":
         if empty: blueprintJson[kv[0]]["value"] = %* {}
         else: blueprintJson[kv[0]]["value"]["0"] = %kv[1]
+      else: discard
 
 # create the base resman that has all the erfs/dirs in it
-let rm = newBasicResMan()
+var rm = newBasicResMan()
 
 if args["--set"]:
   var
@@ -284,31 +283,38 @@ if args["--set"]:
 
   # update individual files
   for file in filterByType(rm):
-    echo $file.resRef
-    echo dir / $file.resRef
-    stream = newFileStream(dir / $file.resRef, fmRead)
-    blueprintRoot = stream.readGffRoot(false)
-    stream.close()
+    try:
+      stream = newFileStream(dir / $file.resRef, fmRead)
+      blueprintRoot = stream.readGffRoot(false)
+      stream.close()
+    except AssertionDefect:
+      echo fmt"Could not read from {$file.resRef}; assertions failed"
+      continue
+    except IOError:
+      echo fmt"IO error (read) with {$file.resRef}; skipping"
+      continue
 
+    echo fmt"updating {$file.resRef}"
     blueprintJson = blueprintRoot.toJson()
     blueprintJson.updateField()
     blueprintRoot = blueprintJson.gffRootFromJson()
 
-    stream = newFileStream(dir / $file.resRef, fmWrite)
-    stream.write(blueprintRoot)
-    stream.close()
+    try:
+      stream = newFileStream(dir / $file.resRef, fmWrite)
+      stream.write(blueprintRoot)
+      stream.close()
+    except AssertionDefect:
+      echo fmt"Could not write to {$file.resRef}; assertions failed"
+    finally:
+      continue
 
   quit()
 
+var rmio: Stream
+
 # Don't cross the streams
 for c in rm.containers:
-  let rmc = newResMan()
   var modifiedFiles = initTable[string, ResMemFile]()
-
-  # rmc is a container that only contains a single erf/dir so we don't update
-  # and instance in one erf/dir with a blueprint in a different erf/dir
-  # This methos is used because ResContainer implementation isn't complete
-  rmc.add(c)
 
   for fileName in split($args["--file"], ","):
     let rr = newResolvedResRef(fileName)
@@ -320,7 +326,7 @@ for c in rm.containers:
       continue
 
     # could just use file name, but let's be thorough in case there are changes later
-    let blueprint = rmc[rr].get()
+    let blueprint = c[rr].get()
     blueprint.seek()
 
     let
@@ -335,6 +341,7 @@ for c in rm.containers:
     # target is the old resRef, or the stringified data from TemplateResRef field in the .ut*
     blueprintResRef = $blueprintStream[field, GffResRef]
 
+    # we have the desired blueprint resref, no figure out what files contain it
     var
       interestingFiles: seq[string]
       instanceStream: GffRoot
@@ -350,7 +357,7 @@ for c in rm.containers:
     # figure out which files have the instances in them
     # filterByMatch is a customized version of that same proc from neverwinter.nim
     # that only looks at files of type --fileTypes (defaults to .git)
-    for res in filterByMatch(rmc, blueprintResRef):
+    for res in filterByMatch(c, blueprintResRef):
       interestingFiles.add($res.resRef)
 
     # found some files that *might* need updating
@@ -369,7 +376,7 @@ for c in rm.containers:
         for file in interestingFiles:
           let 
             rr = newResolvedResRef(file)
-            instance = rmc[rr].get()
+            instance = c[rr].get()
 
           # prep for ResDir is slightly different than erfs
           if c.isResDir():
@@ -379,6 +386,7 @@ for c in rm.containers:
           else: 
             instance.seek()
             instanceStream = instance.io.readGffRoot(false)
+            rmio = instance.io
 
           # this is where all the work is done, the rest is just making shit smell nice
           instanceJson = instanceStream.toJson()
@@ -396,6 +404,7 @@ for c in rm.containers:
             stream.setPosition(0)
             
             # save the changed file to a resmemfile for later use
+            # resmemfile is technically a container, so could add to a new resman, but...
             let rmf = newResMemFile(stream.readAll(), newResRef(rr.resRef, rr.resType), rr.toFile)
             modifiedFiles.add(rr.toFile, rmf)
     else:
@@ -405,12 +414,10 @@ for c in rm.containers:
 
   # modifiedFiles.len > 0 implies this is an erf
   if modifiedFiles.len > 0:
-    let erfPath = resContainerToFullPath(c) # the .mod file pathing
-    #let oldErf = openErf(erfPath)           # the opened .mod file
-    let newErf = erfPath.splitPath.head / "_temp_build." & getFileExt(erfPath)
-
-    let newStream = openFileStream(newErf, fmWrite)
-
+    let
+      erfPath = resContainerToFullPath(c) # the .mod file pathing
+      newErf = erfPath.splitPath.head / "_temp_build." & getFileExt(erfPath)
+      newStream = openFileStream(newErf, fmWrite)
 
     writeErf(io = newStream,
              fileType = "MOD",
@@ -420,41 +427,17 @@ for c in rm.containers:
 
       if modifiedFiles.hasKey($r):
         let res = modifiedFiles[$r].demand(r)
-        echo fmt"Writing modified resource {r}"
+        debug fmt"Writing modified resource {r}"
         io.write(res.readAll())
       else:
         let res = c.demand(r)
         res.seek()
-        echo fmt"Writing unmodified resource {r}"
+        debug fmt"Writing unmodified resource {r}"
         io.write(res.readAll())
 
       discard
-
-    # for some reason, not able to release the lock on erfPath
-    # removing the containers doesn't work.  Maybe have to move to
-    # single resman, then closing the ios on every resref?  That would suck
-    rmc.del(c)
-    rm.del(c)
 
     newStream.close
+    rmio.close
     moveFile(newErf, erfPath)
-    #removeFile(newErf)
-
-when false:
-    writeErf(newStream,
-             oldErf.fileType,
-             oldErf.locStrings,
-             oldErf.strRef,
-             toSeq(oldErf.contents)) do (r: ResRef, io: Stream):
-      
-      if modifiedFiles.hasKey($r):
-        let res = modifiedFiles[$r].demand(r)
-        echo fmt"Writing modified resource {r}"
-        io.write(res.readAll())
-      else:
-        let res = oldErf.demand(r)
-        echo fmt"writing unmodified resource {r}"
-        io.write(res.readAll())
-
-      discard
   

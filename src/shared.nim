@@ -255,8 +255,14 @@ proc getFileExt*(file: string): string =
   file.splitFile.ext.strip(chars = {ExtSep})
 
 iterator filterByType*(rm: ResMan): Res =
+  var res: Res
+
   for o in rm.contents:
-    let res = rm[o].get()
+    try:
+      res = rm[o].get()
+    except IOError:
+      echo fmt"Could not open {$o.resRef}, skipping"
+      continue
 
     if getFileExt($res.resRef) in split($Args["--filetypes"], ","):
       if Args["--only"] and $res.resRef in split($Args["--only"]):
@@ -265,8 +271,34 @@ iterator filterByType*(rm: ResMan): Res =
         yield(res)
 
 iterator filterByMatch*(rm: ResMan, binaryMatch: string): Res =
+  var res: Res
+  
   for o in rm.contents:
-    let res = rm[o].get()
+    try:
+      res = rm[o].get()
+    except IOError:
+      echo fmt"Could not open {$o.resRef}"
+      continue
+
+    if getFileExt($res.resRef) notin split($Args["--filetypes"], ","):
+      continue
+
+    let match = res.readAll(useCache = false).count(binaryMatch)
+    let plurality = if match != 1: "s" else: ""
+
+    if match > 0:
+      debug fmt"Found {$match} instance{plurality} of {binaryMatch} in {$res.resRef}"
+      yield(res)
+
+iterator filterByMatch*(rm: ResContainer, binaryMatch: string): Res =
+  var res: Res
+  
+  for o in rm.contents:
+    try:
+      res = rm[o].get()
+    except IOError:
+      echo fmt"Could not open {$o.resRef}"
+      continue
 
     if getFileExt($res.resRef) notin split($Args["--filetypes"], ","):
       continue
