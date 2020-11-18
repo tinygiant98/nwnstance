@@ -27,6 +27,12 @@ template nest*(p: DebugPrinter, lbl: string, body: any) =
     body
     p.depth -= 1
 
+template emitDebug[T](p: DebugPrinter, t: typedesc[T], k, v: string) =
+  case getLogFilter()
+  of lvlDebug:
+    p.output.writeLine repeat(" ", p.depth * 2), fmt"{k} : {$v}"
+  else: discard
+
 template emitPadded[T](p: DebugPrinter, t: typedesc[T], k, v: string) =
   p.output.writeLine repeat(" ", p.depth * 2), fmt"{k} : {$v}"
   
@@ -51,3 +57,6 @@ proc emit*[T:string](p: DebugPrinter, k: string, v: T) =
 
 proc emit*[T:SomeSignedInt|SomeUnsignedInt](p: DebugPrinter, k: string, v: T) =
   emitPadded p, type(T), k, $v & "|0x" & toHex(v)
+
+proc debug*[T:string](p: DebugPrinter, k: string, v: T) =
+  emitDebug p, type(T), k, v.escape
